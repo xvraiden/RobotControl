@@ -100,11 +100,7 @@ class M:
 
     biganswer=answerlist[0]
     return M.CurMult(M.CurMult(answerlist[0],answerlist[1]),answerlist[2])
-#    for i in range(len(answerlist)):
-#        biganswer=M.CurMult(biganswer,answerlist[i])
-
-    return biganswer
-
+    
   @staticmethod
   def homogenous(variable,Θ,MovementSetFalseIfNone):
     homgenousmatrix=np.eye(4)
