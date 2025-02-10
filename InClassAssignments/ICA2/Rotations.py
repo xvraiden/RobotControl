@@ -21,13 +21,13 @@ def PostMultiplier(originalFrame, newFrame):
 
 def Euler(RotationMatrix):
     # Find phi(rotation 1) using Euler
-    phiEuler = np.rad2deg(math.atan2(Rotation[1, 2], Rotation[0, 2]))
+    phiEuler = np.rad2deg(math.atan2(RotationMatrix[1, 2], RotationMatrix[0, 2]))
 
     # Find theta(rotation 2) using Euler
-    thetaEuler = np.rad2deg(math.atan2(math.sqrt(1 - Rotation[2, 2]**2), Rotation[2, 2]))
+    thetaEuler = np.rad2deg(math.atan2(math.sqrt(1 - RotationMatrix[2, 2]**2), RotationMatrix[2, 2]))
 
     # Find psi(rotation 3) using Euler
-    psiEuler = np.rad2deg(math.atan2(Rotation[2, 1], -Rotation[2, 0]))
+    psiEuler = np.rad2deg(math.atan2(RotationMatrix[2, 1], -RotationMatrix[2, 0]))
 
     return [phiEuler, thetaEuler, psiEuler]
 

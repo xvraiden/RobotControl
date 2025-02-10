@@ -38,40 +38,6 @@ def AxisAngle(RotationMatrix):
     return[k / np.linalg.norm(k), np.rad2deg(theta)]
 
 
-
-
-# Question 1
-print("\nQuestion 2")
-# Generate symbols used for rotation matrix
-R11 = sy.Symbol("R11")
-R12 = sy.Symbol("R12")
-R13 = sy.Symbol("R13")
-R21 = sy.Symbol("R21")
-R22 = sy.Symbol("R22")
-R23 = sy.Symbol("R23")
-R31 = sy.Symbol("R31")
-R32 = sy.Symbol("R32")
-R33 = sy.Symbol("R33")
-
-# Generate rotation matrix symbolically
-Rot2 = np.array([[R11, R12, R13], [R21, R22, R23], [R31, R32, R33]])
-
-# Find the symbolic inverse
-Inverse2 = np.invert(Rot2)
-
-# Find the symbolic transpose
-Transpose2 = np.transpose(Rot2)
-
-# Print all three matricies for comparison
-print(f"The rotation matrix is:\n{Rot2}\n")
-
-print(f"The inverse rotation matrix is:\n{Inverse2}\n")
-
-print(f"The transpose rotation matrix is:\n{Transpose2}\n")
-
-
-
-
 # Question 4
 print("\nQuestion 4")
 
@@ -137,8 +103,6 @@ print(f"\nThe angle of rotation in degrees is :\n{np.round(thetaAA4, 2)}")
 print(f'\nRotation 1(phi) about Z:\n{np.round(phiEuler, 2)} degrees\n')
 print(f'Rotation 2(theta) about Y:\n{np.round(thetaEuler, 2)} degrees\n')
 print(f'Rotation 3(psi) about Z:\n{np.round(psiEuler, 2)} degrees\n')
-
-
 
 
 # Question 5
