@@ -51,28 +51,32 @@ for theta1 in range(0, 360, 1):
     points03 = np.append(points03, np.array([[DH03[0, 3]], [DH03[1, 3]], [DH03[2, 3]]]), 1)
     points04 = np.append(points04, np.array([[DH04[0, 3]], [DH04[1, 3]], [DH04[2, 3]]]), 1)
 
+plotLines = []
+
 figure1 = plt.figure()
 ax = plt.axes(projection = '3d')
+plotLines.append(ax.plot3D(points01[0, 1], points01[1, 1], points01[2, 1]))
+plotLines.append(ax.plot3D(points02[0, 1], points02[1, 1], points02[2, 1]))
+plotLines.append(ax.plot3D(points03[0, 1], points03[1, 1], points03[2, 1]))
+plotLines.append(ax.plot3D(points04[0, 1], points04[1, 1], points04[2, 1]))
+ax.set_title("Link End Position Under Base Rotation")
+ax.set_xlabel("X Coordinate (m)")
+ax.set_ylabel("Y Coordinate (m)")
+ax.set_zlabel("Z Coordinate (m)")
+ax.set_xlim3d(left = -1.25, right = 1.25)
+ax.set_ylim3d(bottom = -1.25, top = 1.25)
+ax.set_zlim3d(bottom = -1.25, top = 1.25)
+ax.legend(["Link 1", "Link 2", "Link 3", "Link 4"])
 
-#ax.plot3D(points01[0, 1:np.shape(points01)[1]], points01[1, 1:np.shape(points01)[1]], points01[2, 1:np.shape(points01)[1]])
-#ax.plot3D(points02[0, 1:np.shape(points02)[1]], points02[1, 1:np.shape(points02)[1]], points02[2, 1:np.shape(points01)[1]])
-#ax.plot3D(points03[0, 1:np.shape(points03)[1]], points03[1, 1:np.shape(points03)[1]], points03[2, 1:np.shape(points01)[1]])
-#ax.plot3D(points04[0, 1:np.shape(points04)[1]], points04[1, 1:np.shape(points04)[1]], points04[2, 1:np.shape(points01)[1]])    
+print(plotLines)
 
-def animate(frame):
-    plt.cla()
-    ax.set_title("Link End Position Under Base Rotation")
-    ax.set_xlabel("X Coordinate (m)")
-    ax.set_ylabel("Y Coordinate (m)")
-    ax.set_zlabel("Z Coordinate (m)")
-    ax.set_xlim3d(left = -1.25, right = 1.25)
-    ax.set_ylim3d(bottom = -1.25, top = 1.25)
-    ax.set_zlim3d(bottom = -1.25, top = 1.25)
-    ax.plot3D(points01[0, 1:frame], points01[1, 1:frame], points01[2, 1:frame])
-    ax.plot3D(points02[0, 1:frame], points02[1, 1:frame], points02[2, 1:frame])
-    ax.plot3D(points03[0, 1:frame], points03[1, 1:frame], points03[2, 1:frame])
-    ax.plot3D(points04[0, 1:frame], points04[1, 1:frame], points04[2, 1:frame])
-    ax.legend(["Link 1", "Link 2", "Link 3", "Link 4"])
+def animate(frame):    
+    # Update the data for each of the four links
+    plotLines[0][0].set_data_3d(points01[0, 1:frame], points01[1, 1:frame], points01[2, 1:frame])
+    plotLines[1][0].set_data_3d(points02[0, 1:frame], points02[1, 1:frame], points02[2, 1:frame])
+    plotLines[2][0].set_data_3d(points03[0, 1:frame], points03[1, 1:frame], points03[2, 1:frame])
+    plotLines[3][0].set_data_3d(points04[0, 1:frame], points04[1, 1:frame], points04[2, 1:frame])
+    return plotLines
 
-ani = FuncAnimation(figure1, animate, frames = np.shape(points01)[1], interval = 0.01)
+ani = FuncAnimation(figure1, animate, frames = np.shape(points01)[1], interval = 1)
 plt.show()
