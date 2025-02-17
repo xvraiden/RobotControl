@@ -1,4 +1,3 @@
-from M import M
 import numpy as np
 import sympy as sy
 import math
@@ -6,7 +5,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import matplotlib.animation as animation
 
-
+def DHSymbolic(a,α,d,Θ):
+    row1 = sy.Matrix([sy.cos(Θ), -sy.sin(Θ) * sy.cos(α), sy.sin(Θ) * sy.sin(α), a * sy.cos(Θ)])
+    row2 = sy.Matrix([sy.sin(Θ), sy.cos(Θ) * sy.cos(α), -sy.cos(Θ) * sy.sin(α), a * sy.sin(Θ)])
+    row3 = sy.Matrix([0, sy.sin(α), sy.cos(α), d])
+    row4 = sy.Matrix([0, 0, 0, 1])
+    return sy.Matrix([row1.T, row2.T, row3.T, row4.T])
 
 ## Setup Symbols ##
 # Create generic DH symbols
@@ -20,7 +24,7 @@ dSy = sy.Symbol("d")
 dhVals = sy.Matrix([[4, 0, 0, sy.Symbol("Θ1")], [3, 0, 0, sy.Symbol("Θ2")], [2, 0, 0, sy.Symbol("Θ3")]])
 
 # Determine the generic transformation matrix
-TGen = M.DHSymbolic(aSy, alphaSy, dSy, thetaSy)
+TGen = DHSymbolic(aSy, alphaSy, dSy, thetaSy)
 
 # Determine the transformation matrix for each reference frame by swapping local symbols into generic matrix
 T01 = TGen.subs({aSy:dhVals[0, 0], alphaSy:dhVals[0, 1], dSy:dhVals[0,2], thetaSy:dhVals[0,3]})
