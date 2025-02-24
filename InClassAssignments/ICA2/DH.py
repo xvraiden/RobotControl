@@ -43,7 +43,7 @@ for theta1 in range(0, 360, 1):
     DH03 = PostMultiplier(DH02, T23)
 
     # Perform Post-Multipication to get the end effector (origin 4) in terms of the base (origin 0)
-    DH04 = PostMultiplier(DH03, T34)    
+    DH04 = PostMultiplier(DH03, T34)
 
     # Append points of each link to their repsective array
     points01 = np.append(points01, np.array([[DH01[0, 3]], [DH01[1, 3]], [DH01[2, 3]]]), 1)
