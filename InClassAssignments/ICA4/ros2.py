@@ -1,7 +1,6 @@
 # sudo apt-get install ros-foxy-tf-transformations
 # sudo pip3 install transforms3d
 
-#https://code-with-me.global.jetbrains.com/W2aa0BQHh8DMDIRNQ7KdEg#p=PY&fp=AD84014EF0765706E64387F721B16EBAEB54ADD23ED6E2B8ADF63F58614A767C&newUi=true
 
 
 #! /usr/bin/env python3
