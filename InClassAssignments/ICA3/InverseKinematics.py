@@ -47,7 +47,7 @@ d3 = -O04[2] - d4
 print(f"Theta 1:\n{math.degrees(theta1)} degrees\n")
 print(f"Theta 2:\n{math.degrees(theta2)} degrees\n")
 print(f"Theta 4:\n{math.degrees(theta4)} degrees\n")
-print(f"d3:\n{d3} meters\n")
+print(f"d3:\n{d3} meters down\n")
 
 # Plug positions into DH matrix to conduct forward kinematics
 DHParams = DHParams.subs({sy.Symbol("Θ1"):theta1, sy.Symbol("Θ2"):theta2, sy.Symbol("d3"):d3, sy.Symbol("Θ4"):theta4})

@@ -1,0 +1,198 @@
+# sudo apt -get install ros-foxy-tf-transformations
+# sudo pip3 install transformations3d
+
+
+#! /usr/bin/env python3
+import rclpy
+import math
+import numpy as np
+from rclpy.node import Node
+from sensor_msgs.msg import Imu
+from geometry_msgs.msg import Twist
+from geometry_msgs.msg import PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float32
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
+
+
+class Turtlebot3PIDController(Node):
+
+	def __init__(self):
+		super().__init__('turtlebot_subscriber')
+		print("Turtlebot Subscriber Node Initialized")
+
+		#Robot initial States
+		self.x = 0
+		self.y = 0
+		self.theta = 0
+		self.linear_vel = 0.5
+		self.angular_vel = 0
+		self.radius = 5.0
+		self.counter = 0
+
+		#PID vars
+		self.cumulative_error = 0
+		self.last_error = 0
+
+		#PID gains
+		self.Kp = '''FILL HERE'''
+		self.Kd = '''FILL HERE'''
+		self.Ki = '''FILL HERE'''
+
+		#PID initial parameters
+		self.error = 99999
+		self.derivative = 0.0
+		self.integral = 0.0
+		self.prev_err = 0.0
+		self.int_err = 1.0
+		self.prevTime = self.get_clock().now()
+		self.prev_time = self.get_clock().now()
+
+		self.distThreshold = 0.1 #distance threshold for waypoint navigation
+		self.maxVelError = 0.1
+		self.maxMotorVel = 2.34
+		self.minMotorVel = -2.34
+		self.motorVel = 0
+
+		self.angVelTopic = "/leftMotorVel"
+		self.angVelTopicType = "Float32"
+
+		self.rate = 10 #10hz
+		self.odomData = None #empty variable
+
+		self.odomTopic = '/odom'
+
+		#Data publishing and subscription
+		self.create_subscription(Odometry, '/odom', self.odom_callback, 10)# subscribe to the odometry data and when messages are received, self.odom_callback is invoked # NEW
+		self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)# publishing velocity data # NEW
+		self.err = Float32()
+
+		#coordinate waypoints
+		#example
+		self.waypoints = np.array([[1,1], [5,5], [9,1], [3,-5]])
+		self.waypoint_size = self.waypoints.shape[0]
+
+		#sinusoidal waypoint
+		'''
+
+
+				FILL HERE- Define waypoints that follow a sinusoidal curve
+
+												'''
+
+		self.waypoint_counter = 0
+		self.maxMotorVel = 2.84
+		self.minMotorVel = -2.84
+
+		self.timer = self.create_timer(0.1, self.run)
+
+	def odom_callback(self, msg): # Initiate odometry data
+		self.odomData = msg
+
+	def getOrientation(self): #get the yaw angle by converting rotations to euler angles
+		orientation_q = self.odomData.pose.pose.orientation
+		orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
+		(roll, pitch, yaw) = euler_from_quaternion(orientation_list)
+		self.theta = yaw
+		return self.theta
+
+	def saturate(self, input, delta): #function to saturate the output from the PID controller inside an acceptable range
+		if(input > self.maxMotorVel):
+			control = self.maxMotorVel
+			self.int_err = self.int_err - (self.err * delta)
+
+		elif(input < self.minMotorVel):
+			control = self.minMotorVel
+			self.int_err = self.int_err - (self.err * delta)
+		else:
+			control = input
+		return control
+
+	def calculate_error(self):
+		yaw = self.getOrientation()
+		orientation_q = self.odomData.pose.pose.orientation
+
+		truex = orientation_q.x
+		truey = orientation_q.y
+		self.err = np.arctan2(self.goal[1], self.goal[0]) - yaw
+
+		return self.err
+
+	def pid_controller(self):
+		current_error = self.calculate_error() # call the output from the calculate_error() function to use it in the controller
+		dt = (self.get_clock().now() - self.prev_time).nanoseconds / 1e-9
+		# if dt == 0:
+		# 	return 0
+		delta = 0
+
+		# take the current area undre the area curve and add the new error area
+		self.cumulative_error = self.cumulative_error + (current_error * dt)
+
+		# take the derivative of the rate of change of error
+		der_term = (current_error - self.last_error) / dt
+
+		# define easier
+		int_term = self.cumulative_error
+	
+		# construct PID
+		control = (self.Kp * current_error) + (self.Ki * int_term) + (self.Kd * der_term)
+
+		# ensure we dont overload the motors
+		control = self.saturate(control, delta)
+
+		# keep track of last error
+		self.last_error = current_error
+
+
+		return control
+
+	def run(self):
+		self.rate = self.create_rate(10)
+		self.prev_time=self.get_clock().now()
+		if self.odomData is not None:
+			#goal - waypoints
+			#example-coordinate waypoints
+			wp_x = self.waypoints[self.waypoint_counter][0]
+			wp_y = self.waypoints[self.waypoint_counter][1]
+			self.goal = np.array([wp_x, wp_y])
+
+			#sinusoidal
+			'''
+			FILL HERE- call the true x,y of the sinusoidal waypoints here
+														'''
+
+			self.x = self.odomData.pose.pose.orientation.x
+			self.y = self.odomData.pose.pose.orientation.y
+
+			current_state = np.array([self.x, self.y])
+			self.calculate_error()
+
+			self.distError = np.linalg.norm(self.goal - current_state) #norm of the difference between two vectors
+
+			if(self.distError > self.distThreshold): #the controller runs for a particular waypoint until it reaches a certain threshold
+				'''FILL HERE - run the controller'''
+				dummy = 0
+			else: #once the threshold is reached, we go to the next waypoint
+				self.waypoint_counter +=1
+				if(self.waypoint_counter == self.waypoint_size): #if it is the last waypoint, we go to the first waypoint from there
+					self.waypoint_counter = 0
+				'''FILL HERE - run the controller'''
+
+			twist = Twist()
+			twist.linear.x = 0.3
+			#twist.linear.y = 0.3
+			# print(control)
+			twist.angular.z = self.pid_controller()
+
+			self.cmd_vel_pub.publish(twist)
+			self.rate.sleep()
+
+def main(args=None):
+    rclpy.init(args=args)
+    controller = Turtlebot3PIDController()
+    rclpy.spin(controller)
+    controller.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+	main()
