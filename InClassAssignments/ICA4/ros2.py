@@ -1,6 +1,5 @@
-# sudo apt-get install ros-foxy-tf-transformations
-# sudo pip3 install transforms3d
-
+# sudo apt -get install ros-foxy-tf-transformations
+# sudo pip3 install transformations3d
 
 
 #! /usr/bin/env python3
@@ -14,7 +13,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
-
+import sys
 
 class Turtlebot3PIDController(Node):
 
@@ -26,16 +25,16 @@ class Turtlebot3PIDController(Node):
 		self.x = 0
 		self.y = 0
 		self.theta = 0
-		self.linear_vel = 0.5
+		self.linear_vel = .3
 		self.angular_vel = 0
 		self.radius = 5.0
 		self.counter = 0
 
 
 		#PID gains
-		self.Kp = 1
-		self.Kd = 0
-		self.Ki = 0
+		self.Kp = 4 #Reaction to current error
+		self.Ki = 1E-18 #SS correction, too high means past is too important
+		self.Kd = 50 #Damping on the error (also velocity)
 
 		#PID initial parameters
 		self.error = 0
@@ -67,7 +66,11 @@ class Turtlebot3PIDController(Node):
 
 		#coordinate waypoints
 		#example
+
+		#########WAYPOINT SETTINGS
 		self.waypoints = np.array([[1,1], [5,5], [9,1], [3,-5]])
+		#########
+
 		self.waypoint_size = self.waypoints.shape[0]
 
 		#sinusoidal waypoint
@@ -110,14 +113,11 @@ class Turtlebot3PIDController(Node):
 
 	def calculate_error(self):
 		yaw = self.getOrientation()
-		orientation_q = self.odomData.pose.pose.orientation
 
-		truex = orientation_q.x
-		truey = orientation_q.y
-		self.err = np.arctan2(self.goal[1] - truey, self.goal[0] - truex) - yaw
-
-		print(np.arctan2(self.goal[1] - truey, self.goal[0] - truex))
-		print(self.err)
+		self.err = np.arctan2(self.goal[1] - self.y, self.goal[0] - self.x) - yaw
+		print(f"Im at {self.x, self.y}\n")
+		print(f"Im heading to {self.goal[0], self.goal[1]}\n")
+		print(f"My error is {self.err}\n")
 		return self.err
 
 	def pid_controller(self):
@@ -145,29 +145,29 @@ class Turtlebot3PIDController(Node):
 		# keep track of last error
 		self.prev_err = current_error
 
-
 		return control
 
 	def run(self):
-		print("Im here")
 		self.rate = self.create_rate(10)
 		self.prev_time=self.get_clock().now()
 		if self.odomData is not None:
 			#goal - waypoints
-			#example-coordinate waypoints
-			if (self.waypoint_counter >= self.waypoints.shape[0]):
+			if (self.waypoint_counter < self.waypoints.shape[0]):
+				# example-coordinate waypoints
+				print("Box")
 				wp_x = self.waypoints[self.waypoint_counter][0]
 				wp_y = self.waypoints[self.waypoint_counter][1]
 				self.goal = np.array([wp_x, wp_y])
 			else:
+				print("Sine")
 				#sinusoidal
-				wp_x = self.sinSteps[self.waypoint_counter][0]
-				wp_y = self.sinSteps[self.waypoint_counter][1]
+				wp_x = self.sinSteps[self.waypoint_counter - self.waypoints.shape[0]][0]
+				wp_y = self.sinSteps[self.waypoint_counter - self.waypoints.shape[0]][1]
 				self.goal = np.array([wp_x, wp_y])
 
 
-			self.x = self.odomData.pose.pose.orientation.x
-			self.y = self.odomData.pose.pose.orientation.y
+			self.x = self.odomData.pose.pose.position.x
+			self.y = self.odomData.pose.pose.position.y
 
 			current_state = np.array([self.x, self.y])
 			self.calculate_error()
@@ -179,18 +179,20 @@ class Turtlebot3PIDController(Node):
 				dummy = 0
 			else: #once the threshold is reached, we go to the next waypoint
 				self.waypoint_counter +=1
-				if(self.waypoint_counter == self.waypoint_size): #if it is the last waypoint, we go to the first waypoint from there
-					self.waypoint_counter = 0
+				if(self.waypoint_counter == self.waypoints.shape[0] + self.sinSteps.shape[0]): #if it is the last waypoint, we go to the first waypoint from there
+					self.linear_vel = 0.0
+					print("Completed")
 				'''FILL HERE - run the controller'''
 
 			twist = Twist()
-			twist.linear.x = 0.3
+			twist.linear.x = self.linear_vel
 			#twist.linear.y = 0.3
 			# print(control)
 			twist.angular.z = self.pid_controller()
 
 			self.cmd_vel_pub.publish(twist)
-			self.rate.sleep()
+			#self.rate.sleep()
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -198,6 +200,7 @@ def main(args=None):
     rclpy.spin(controller)
     controller.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
 	main()
