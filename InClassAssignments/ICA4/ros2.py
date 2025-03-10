@@ -1,5 +1,5 @@
-# sudo apt -get install ros-foxy-tf-transformations
-# sudo pip3 install transformations3d
+# sudo apt-get install ros-foxy-tf-transformations
+# sudo pip3 install transforms3d
 
 
 #! /usr/bin/env python3
@@ -30,17 +30,14 @@ class Turtlebot3PIDController(Node):
 		self.radius = 5.0
 		self.counter = 0
 
-		#PID vars
-		self.cumulative_error = 0
-		self.last_error = 0
 
 		#PID gains
-		self.Kp = '''FILL HERE'''
-		self.Kd = '''FILL HERE'''
-		self.Ki = '''FILL HERE'''
+		self.Kp = 1
+		self.Kd = 0
+		self.Ki = 0
 
 		#PID initial parameters
-		self.error = 99999
+		self.error = 0
 		self.derivative = 0.0
 		self.integral = 0.0
 		self.prev_err = 0.0
@@ -73,12 +70,14 @@ class Turtlebot3PIDController(Node):
 		self.waypoint_size = self.waypoints.shape[0]
 
 		#sinusoidal waypoint
-		'''
+		self.amplitude = 2
+		self.maxT = 3
+		self.numSinSteps = 100
+		self.sinSteps = np.empty((self.numSinSteps,2))
 
-
-				FILL HERE- Define waypoints that follow a sinusoidal curve
-
-												'''
+		for i in range(self.numSinSteps):
+			newStep = np.array([(i+1)*(self.maxT)*(1/self.numSinSteps), self.amplitude*np.sin((i+1)*(self.maxT)*(1/self.numSinSteps))])
+			self.sinSteps[i] = [newStep[0], newStep[1]]
 
 		self.waypoint_counter = 0
 		self.maxMotorVel = 2.84
@@ -114,8 +113,10 @@ class Turtlebot3PIDController(Node):
 
 		truex = orientation_q.x
 		truey = orientation_q.y
-		self.err = np.arctan2(self.goal[1], self.goal[0]) - yaw
+		self.err = np.arctan2(self.goal[1] - truey, self.goal[0] - truex) - yaw
 
+		print(np.arctan2(self.goal[1] - truey, self.goal[0] - truex))
+		print(self.err)
 		return self.err
 
 	def pid_controller(self):
@@ -126,40 +127,43 @@ class Turtlebot3PIDController(Node):
 		delta = 0
 
 		# take the current area undre the area curve and add the new error area
-		self.cumulative_error = self.cumulative_error + (current_error * dt)
+		self.error = self.error + (current_error * dt)
 
 		# take the derivative of the rate of change of error
-		der_term = (current_error - self.last_error) / dt
+		self.derivative = (current_error - self.prev_err) / dt
 
 		# define easier
-		int_term = self.cumulative_error
+		self.integral = self.error
 	
 		# construct PID
-		control = (self.Kp * current_error) + (self.Ki * int_term) + (self.Kd * der_term)
+		control = (self.Kp * current_error) + (self.Ki * self.integral) + (self.Kd * self.derivative)
 
 		# ensure we dont overload the motors
 		control = self.saturate(control, delta)
 
 		# keep track of last error
-		self.last_error = current_error
+		self.prev_err = current_error
 
 
 		return control
 
 	def run(self):
+		print("Im here")
 		self.rate = self.create_rate(10)
 		self.prev_time=self.get_clock().now()
 		if self.odomData is not None:
 			#goal - waypoints
 			#example-coordinate waypoints
-			wp_x = self.waypoints[self.waypoint_counter][0]
-			wp_y = self.waypoints[self.waypoint_counter][1]
-			self.goal = np.array([wp_x, wp_y])
+			if (self.waypoint_counter >= self.waypoints.shape[0]):
+				wp_x = self.waypoints[self.waypoint_counter][0]
+				wp_y = self.waypoints[self.waypoint_counter][1]
+				self.goal = np.array([wp_x, wp_y])
+			else:
+				#sinusoidal
+				wp_x = self.sinSteps[self.waypoint_counter][0]
+				wp_y = self.sinSteps[self.waypoint_counter][1]
+				self.goal = np.array([wp_x, wp_y])
 
-			#sinusoidal
-			'''
-			FILL HERE- call the true x,y of the sinusoidal waypoints here
-														'''
 
 			self.x = self.odomData.pose.pose.orientation.x
 			self.y = self.odomData.pose.pose.orientation.y
