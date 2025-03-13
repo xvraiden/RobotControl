@@ -29,12 +29,13 @@ class Turtlebot3PIDController(Node):
 		self.angular_vel = 0
 		self.radius = 5.0
 		self.counter = 0
+		self.running = 1.0
 
 
 		#PID gains
 		self.Kp = 4 #Reaction to current error
-		self.Ki = 1E-18 #SS correction, too high means past is too important
-		self.Kd = 50 #Damping on the error (also velocity)
+		self.Ki = 2E-20 #SS correction, too high means past is too important
+		self.Kd = 100 #Damping on the error (also velocity)
 
 		#PID initial parameters
 		self.error = 0
@@ -74,14 +75,15 @@ class Turtlebot3PIDController(Node):
 		self.waypoint_size = self.waypoints.shape[0]
 
 		#sinusoidal waypoint
-		self.amplitude = 2
-		self.maxT = 3
+		self.amplitude = 1
+		self.frequency = 2/9 #cycles/xunit
+		self.maxT = 9
 		self.numSinSteps = 100
 		self.sinSteps = np.empty((self.numSinSteps,2))
 
 		for i in range(self.numSinSteps):
-			newStep = np.array([(i+1)*(self.maxT)*(1/self.numSinSteps), self.amplitude*np.sin((i+1)*(self.maxT)*(1/self.numSinSteps))])
-			self.sinSteps[i] = [newStep[0], newStep[1]]
+			newStep = np.array([(i+1)*(self.maxT)*(1/self.numSinSteps), self.amplitude*np.sin(2 * np.pi * self.frequency * (i+1)*(self.maxT)*(1/self.numSinSteps))])
+			self.sinSteps[i] = [newStep[1], newStep[0]]
 
 		self.waypoint_counter = 0
 		self.maxMotorVel = 2.84
@@ -96,6 +98,7 @@ class Turtlebot3PIDController(Node):
 		orientation_q = self.odomData.pose.pose.orientation
 		orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
 		(roll, pitch, yaw) = euler_from_quaternion(orientation_list)
+
 		self.theta = yaw
 		return self.theta
 
@@ -114,7 +117,18 @@ class Turtlebot3PIDController(Node):
 	def calculate_error(self):
 		yaw = self.getOrientation()
 
-		self.err = np.arctan2(self.goal[1] - self.y, self.goal[0] - self.x) - yaw
+		desiredAngle = np.arctan2(self.goal[1] - self.y, self.goal[0] - self.x)
+
+		path1 = desiredAngle - yaw
+		path2 = desiredAngle - (np.pi - yaw)
+
+		if (abs(path1) > abs(path2)):
+			self.err = path2
+		else:
+			self.err = path1
+
+		#self.err = np.pi / 2 - yaw #tuning code
+
 		print(f"Im at {self.x, self.y}\n")
 		print(f"Im heading to {self.goal[0], self.goal[1]}\n")
 		print(f"My error is {self.err}\n")
@@ -175,23 +189,25 @@ class Turtlebot3PIDController(Node):
 			self.distError = np.linalg.norm(self.goal - current_state) #norm of the difference between two vectors
 
 			if(self.distError > self.distThreshold): #the controller runs for a particular waypoint until it reaches a certain threshold
-				'''FILL HERE - run the controller'''
 				dummy = 0
 			else: #once the threshold is reached, we go to the next waypoint
 				self.waypoint_counter +=1
 				if(self.waypoint_counter == self.waypoints.shape[0] + self.sinSteps.shape[0]): #if it is the last waypoint, we go to the first waypoint from there
 					self.linear_vel = 0.0
+					self.running = 0.0
 					print("Completed")
-				'''FILL HERE - run the controller'''
 
 			twist = Twist()
 			twist.linear.x = self.linear_vel
 			#twist.linear.y = 0.3
 			# print(control)
-			twist.angular.z = self.pid_controller()
+			twist.angular.z = self.pid_controller() * self.running
 
 			self.cmd_vel_pub.publish(twist)
 			#self.rate.sleep()
+
+			if (self.running == 0.0):
+				exit()
 
 
 def main(args=None):
