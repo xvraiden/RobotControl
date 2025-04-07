@@ -35,9 +35,9 @@ class Turtlebot3PIDController(Node):
 		self.last_error = 0
 
 		#PID gains
-		self.Kp = '''FILL HERE'''
-		self.Kd = '''FILL HERE'''
-		self.Ki = '''FILL HERE'''
+		self.Kp = 0.001
+		self.Kd = 0
+		self.Ki = 0
 
 		#PID initial parameters
 		self.error = 99999
@@ -73,12 +73,14 @@ class Turtlebot3PIDController(Node):
 		self.waypoint_size = self.waypoints.shape[0]
 
 		#sinusoidal waypoint
-		'''
+		self.amplitude = 2
+		self.maxT = 3
+		self.numSinSteps = 100
+		self.sinSteps = np.empty((self.numSinSteps,2))
 
-
-				FILL HERE- Define waypoints that follow a sinusoidal curve
-
-												'''
+		for i in range(self.numSinSteps):
+			newStep = np.array([(i+1)*(self.maxT)*(1/self.numSinSteps), self.amplitude*np.sin((i+1)*(self.maxT)*(1/self.numSinSteps))])
+			self.sinSteps[i] = [newStep[0], newStep[1]]
 
 		self.waypoint_counter = 0
 		self.maxMotorVel = 2.84
@@ -152,14 +154,16 @@ class Turtlebot3PIDController(Node):
 		if self.odomData is not None:
 			#goal - waypoints
 			#example-coordinate waypoints
-			wp_x = self.waypoints[self.waypoint_counter][0]
-			wp_y = self.waypoints[self.waypoint_counter][1]
-			self.goal = np.array([wp_x, wp_y])
+			if (self.waypoint_counter >= self.waypoints.shape[0]):
+				wp_x = self.waypoints[self.waypoint_counter][0]
+				wp_y = self.waypoints[self.waypoint_counter][1]
+				self.goal = np.array([wp_x, wp_y])
+			else:
+				#sinusoidal
+				wp_x = self.sinSteps[self.waypoint_counter][0]
+				wp_y = self.sinSteps[self.waypoint_counter][1]
+				self.goal = np.array([wp_x, wp_y])
 
-			#sinusoidal
-			'''
-			FILL HERE- call the true x,y of the sinusoidal waypoints here
-														'''
 
 			self.x = self.odomData.pose.pose.orientation.x
 			self.y = self.odomData.pose.pose.orientation.y
@@ -182,7 +186,7 @@ class Turtlebot3PIDController(Node):
 			twist.linear.x = 0.3
 			#twist.linear.y = 0.3
 			# print(control)
-			twist.angular.z = self.pid_controller()
+			twist.angular.z = 0#self.pid_controller()
 
 			self.cmd_vel_pub.publish(twist)
 			self.rate.sleep()

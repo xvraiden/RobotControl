@@ -9,18 +9,6 @@ def DHSymbolic(a,α,d,Θ):
     row4 = sy.Matrix([0, 0, 0, 1])
     return sy.Matrix([row1.T, row2.T, row3.T, row4.T])
 
-def Euler(RotationMatrix):
-    # Find phi(rotation 1) using Euler
-    phiEuler = np.rad2deg(math.atan2(RotationMatrix[1, 2], RotationMatrix[0, 2]))
-
-    # Find theta(rotation 2) using Euler
-    thetaEuler = np.rad2deg(math.atan2(math.sqrt(1 - RotationMatrix[2, 2]**2), RotationMatrix[2, 2]))
-
-    # Find psi(rotation 3) using Euler
-    psiEuler = np.rad2deg(math.atan2(RotationMatrix[2, 1], -RotationMatrix[2, 0]))
-
-    return [phiEuler, thetaEuler, psiEuler]
-
 ## Setup ##
 # Generate DH table in inches and radians
 dhVals = sy.Matrix([[0, 0, sy.Symbol("d1"), sy.Symbol("Θ1")], [0, -sy.pi / 2, sy.Symbol("d2"), 0], [0, 0, sy.Symbol("d3"),  0]])

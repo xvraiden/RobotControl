@@ -11,7 +11,10 @@ def DHSymbolic(a,α,d,Θ):
 
 ## Setup ##
 # Generate DH table in inches and radians
-dhVals = sy.Matrix([[0, sy.pi / 2, sy.Symbol("a1"), sy.Symbol("Θ1") + sy.pi / 2], [sy.Symbol("a2"), 0, 0, sy.Symbol("Θ2")], [sy.Symbol("a3"), 0, 0,  sy.Symbol("Θ3")]])
+dhVals = sy.Matrix([[0, -sy.pi / 2, sy.Symbol("d1"), 0], [0, sy.pi / 2, sy.Symbol("d2"), -sy.pi / 2], [0, 0, sy.Symbol("d3"),  0]]) #cliff
+#dhVals = sy.Matrix([[0, sy.pi / 2, sy.Symbol("d1"), -sy.pi / 2], [0, sy.pi / 2, sy.Symbol("d2"), sy.pi / 2], [0, 0, sy.Symbol("d3"),  0]]) #nathan
+#dhVals = sy.Matrix([[0, -sy.pi / 2, sy.Symbol("d1"), 0], [0, sy.pi / 2, sy.Symbol("d2"), -sy.pi / 2], [0, 0, sy.Symbol("d3"),  0]]) #brian
+
 
 ## Part i ##
 # Find symbolic transformation matrix for successive frame
@@ -34,27 +37,23 @@ sy.pprint(T12)
 print("\nT23:")
 sy.pprint(T23)
 
-print("\nT02:")
-sy.pprint(T02)
-
 print("\nT03:")
 sy.pprint(T03)
 
-
 ## Begin Jacobian ##
 # Determine each joint jacobian
-# Joint 1 (revolute)
-J1 = sy.Matrix([T00[0:3, 2].cross(T03[0:3, 3] - T00[0:3, 3]), T00[0:3, 2]])
+# Joint 1 (prismatic)
+J1 = sy.Matrix([T00[0:3, 2], sy.zeros(3, 1)])
 
-# Joint 2 (revolute)
-J2 = sy.Matrix([T01[0:3, 2].cross(T03[0:3, 3] - T01[0:3, 3]), T01[0:3, 2]])
+# Joint 2 (prismatic)
+J2 = sy.Matrix([T01[0:3, 2], sy.zeros(3, 1)])
 
-# Joint 3 (revolute)
-J3 = sy.Matrix([T02[0:3, 2].cross(T03[0:3, 3] - T02[0:3, 3]), T02[0:3, 2]])
+# Joint 3 (prismatic)
+J3 = sy.Matrix([T02[0:3, 2], sy.zeros(3, 1)])
 
 
 # Combine joint columns
 Jsym = sy.Matrix([[J1.T], [J2.T], [J3.T]]).T
 
 print("Jacobian:")
-sy.pprint(sy.simplify(Jsym))
+sy.pprint(Jsym)
