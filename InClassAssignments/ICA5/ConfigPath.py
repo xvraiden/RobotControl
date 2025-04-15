@@ -80,8 +80,8 @@ while (abs(currentTargetDist) > acceptableTargetError):
     robotPoints = robotPoints.row_insert(sy.shape(robotPoints)[0], newPoint)
 
     # Display new position on plot
-    robotPlot[0].set_xdata([robotPoints[step, 0], robotPoints[step, 0]])
-    robotPlot[0].set_ydata([robotPoints[step, 1], robotPoints[step, 1]])
+    robotPlot[0].set_xdata([robotPoints[step, 0]])
+    robotPlot[0].set_ydata([robotPoints[step, 1]])
     plt.pause(0.05)
 
     # Next calc

@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
 # Setup variables
 time0 = 0 # initial time
-tB = 0.5 # time before constant velocity in parabolic blend
 accelBlend = 50 # parabolic blend acceleration
 
 initPos1 = 10 # initial position in degrees
@@ -56,34 +56,57 @@ fig1 = plt.figure(1)
 plt.plot(time, posA)
 plt.xlabel("Time (s)")
 plt.ylabel("Position (degrees)")
-plt.title("Position vs Time")
+plt.title("Cubic Position vs Time")
 
 fig2 = plt.figure(2)
 plt.plot(time, velA)
 plt.xlabel("Time (s)")
 plt.ylabel("Velocity (degrees/sec)")
-plt.title("Velocity vs Time")
+plt.title("Cubic Velocity vs Time")
 
 fig3 = plt.figure(3)
 plt.plot(time, accelA)
 plt.xlabel("Time (s)")
 plt.ylabel("Acceleration (degrees/sec^2)")
-plt.title("Acceleration vs Time")
+plt.title("Cubic Acceleration vs Time")
 
+# Part b
 posB = np.array([])
 velB = np.array([])
 accelB = np.array([])
-# compute linear blend move 1 part b
+
+# Compute tB for move 1 and 2
+tB1P = (accelBlend * time1 + math.sqrt((accelBlend * time1)**2 - 4 * accelBlend * (finalPos1 - initPos1))) / (2 * accelBlend) # time before constant velocity in parabolic blend
+tB2P = (-accelBlend * (time2 - time1) + math.sqrt((-accelBlend * (time2 - time1))**2 - 4 * -accelBlend * (finalPos2 - initPos2))) / (2 * -accelBlend) # time before constant velocity in parabolic blend
+
+tB1N = (accelBlend * time1 - math.sqrt((accelBlend * time1)**2 - 4 * accelBlend * (finalPos1 - initPos1))) / (2 * accelBlend) # time before constant velocity in parabolic blend
+tB2N = (-accelBlend * (time2 - time1) - math.sqrt((-accelBlend * (time2 - time1))**2 - 4 * -accelBlend * (finalPos2 - initPos2))) / (2 * -accelBlend) # time before constant velocity in parabolic blend
+
+if tB1N < tB1P and tB1N > 0:
+    tB1 = tB1N
+elif tB1P > 0:
+    tB1 = tB1P
+else:
+    tB1 = tB1N
+
+if tB2N < tB2P and tB2N > 0:
+    tB2 = tB2N
+elif tB2P > 0:
+    tB2 = tB2P
+else:
+    tB2 = tB2N
+
+# Compute linear blend move 1 part b
 for i in time:
-    if i <= tB:
+    if i <= tB1:
         # move 1 accel
         posB = np.append(posB, initPos1 + (accelBlend / 2) * i**2)
         velB = np.append(velB, accelBlend * i)
         accelB = np.append(accelB, accelBlend)
-    elif i <= time1 - tB:
+    elif i <= time1 - tB1:
         # move 1 const
-        posB = np.append(posB, ((finalPos1 - initPos1 + (accelBlend * tB * time1)) / 2) + (accelBlend * tB * i))
-        velB = np.append(velB, accelBlend * tB)
+        posB = np.append(posB, ((finalPos1 + initPos1 - (accelBlend * tB1 * time1)) / 2) + (accelBlend * tB1 * i))
+        velB = np.append(velB, accelBlend * tB1)
         accelB = np.append(accelB, 0)
     elif i <= time1:
         # move 1 decel
@@ -91,15 +114,15 @@ for i in time:
         velB = np.append(velB, accelBlend * time1 - accelBlend * i)
         accelB = np.append(accelB, -accelBlend)
 
-    elif i <= time1 + tB:
+    elif i <= time1 + tB2:
         # move 2 accel
         posB = np.append(posB, initPos2 - (accelBlend / 2) * (i - time1)**2)
         velB = np.append(velB, -accelBlend * (i - time1))
         accelB = np.append(accelB, -accelBlend)
-    elif i <= time2 - tB:
+    elif i <= time2 - tB2:
         # move 2 const
-        posB = np.append(posB, ((finalPos2 + initPos2 + (accelBlend * tB * (time2 - time1))) / 2) - (accelBlend * tB * (i - time1)))
-        velB = np.append(velB, -accelBlend * tB)
+        posB = np.append(posB, ((finalPos2 + initPos2 + (accelBlend * tB2 * (time2 - time1))) / 2) - (accelBlend * tB2 * (i - time1)))
+        velB = np.append(velB, -accelBlend * tB2)
         accelB = np.append(accelB, 0)
     else:
         # move 2 decel
@@ -112,17 +135,17 @@ fig1 = plt.figure(4)
 plt.plot(time, posB)
 plt.xlabel("Time (s)")
 plt.ylabel("Position (degrees)")
-plt.title("Position vs Time")
+plt.title("Blend Position vs Time")
 
 fig2 = plt.figure(5)
 plt.plot(time, velB)
 plt.xlabel("Time (s)")
 plt.ylabel("Velocity (degrees/sec)")
-plt.title("Velocity vs Time")
+plt.title("Blend Velocity vs Time")
 
 fig3 = plt.figure(6)
 plt.plot(time, accelB)
 plt.xlabel("Time (s)")
 plt.ylabel("Acceleration (degrees/sec^2)")
-plt.title("Acceleration vs Time")
+plt.title("Blend Acceleration vs Time")
 plt.show()
