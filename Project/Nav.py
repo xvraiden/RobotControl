@@ -34,6 +34,7 @@ class Turtlebot3PIDController(Node):
         # Waypoint params
         self.waypointParcerSize = 0.1 # distance between each waypoint
         self.distThreshold = 0.05  # distance threshold for waypoint navigation
+        self.obstacleThreshold = 55 # cutoff for what is and isnt an obstacle
 
         # Force tuning coeff
         self.attractiveForceCoeff = 1  # attractive force scalar
@@ -42,8 +43,8 @@ class Turtlebot3PIDController(Node):
         self.randomWalkMag = self.stepSizeCoeff  # magnitude of random walk at local min
 
         # Distance thresholds
-        self.attractiveSwitch = 1  # distance where attractive force becomes linear
-        self.repulsiveSwitch = 1  # distance at which repulsive is negligible
+        self.attractiveSwitch = 0.3  # distance where attractive force becomes linear
+        self.repulsiveSwitch = 0.1  # distance at which repulsive is negligible
         self.acceptableTargetError = self.distThreshold  # distance at which the robot is close enough to target
         self.notMovingDist = 0.001  # distance at which the robot is considered at a local min
         self.notMovingLookback = 2  # number of points to look back for local min (avoids oscillation)
@@ -114,13 +115,49 @@ class Turtlebot3PIDController(Node):
         self.odomData = msg
 
     def map_callback(self, msg):  # Initiate odometry data
+        now = self.get_clock().now()
         self.mapData = msg
+        self.obstacles = self.WhereAreTheObsticles()
+        if self.odomData is not None and self.goalData is not None:
+            self.calcPath = True
 
     def goal_callback(self, msg):  # Initiate odometry data
         if self.odomData is not None:
-            self.running = 0.0
             self.goalData = [msg.pose.position.x, msg.pose.position.y]
             self.calcPath = True
+
+    def WhereAreTheObsticles(self):
+        RawMapData = self.mapData
+        if RawMapData is None:
+            return np.empty((0, 2))
+        H = RawMapData.info.height
+        W = RawMapData.info.width
+        grid = np.array(RawMapData.data, dtype=int).reshape(H, W)
+
+        resolution = RawMapData.info.resolution
+        origin = RawMapData.info.origin
+
+        '''print(f"Map dim {H, W}")
+        print(f"Res {resolution}")
+        print(f"Map Pos {origin.position.x, origin.position.y}")
+        print(f"0 {grid.shape[0]}")'''
+
+        q = origin.orientation
+        orientation_list = [q.x, q.y, q.z, q.w]
+        _, _, yaw = euler_from_quaternion(orientation_list)
+
+        self.actualcord = np.empty((0, 2))
+        for row in range(grid.shape[0]):
+            for col in range(grid.shape[1]):
+                NathanNum = grid[row, col]
+                if NathanNum > self.obstacleThreshold:
+                    x_cell = col * resolution
+                    y_cell = row * resolution
+                    x_world = origin.position.x + (x_cell * np.cos(yaw) - y_cell * np.sin(yaw))
+                    y_world = origin.position.y + (x_cell * np.sin(yaw) + y_cell * np.cos(yaw))
+                    self.actualcord = np.vstack((self.actualcord, [x_world, y_world]))
+
+        return self.actualcord
 
     def determineRoute(self):
         now = self.get_clock().now()
@@ -177,19 +214,23 @@ class Turtlebot3PIDController(Node):
             # Next calc
             self.step = self.step + 1
 
-        '''fig = plt.figure()
-        robotPlot = plt.plot(self.robotPoints[0, 0], self.robotPoints[0, 1], 'r*', label="Robot")
+        fig = plt.figure(1)
+        robotPlot = plt.plot(self.robotPoints[:, 0], self.robotPoints[:, 1], 'r*', label="Robot")
         plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
         plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
         plt.title("Path Simulation")
         plt.legend()
-        plt.pause(0.001)'''
+        plt.pause(0.001)
 
         waypointIncrementer = int(self.waypointParcerSize / self.stepSizeCoeff)
 
-        self.waypoints = self.robotPoints[waypointIncrementer::waypointIncrementer]
-        self.running = 1.0 # enable movement
-        print((self.get_clock().now() - now).nanoseconds * 1e-9)
+        if np.shape(self.robotPoints)[0] >= waypointIncrementer:
+            self.waypoints = self.robotPoints[waypointIncrementer::waypointIncrementer]
+            self.running = 1.0  # enable movement
+            print("Parcing")
+        else:
+            self.waypoints = None
+        #print((self.get_clock().now() - now).nanoseconds * 1e-9)
 
     def getLocation(self):  # get the yaw angle by converting rotations to euler angles
         orientation_q = self.odomData.pose.pose.orientation
@@ -218,22 +259,15 @@ class Turtlebot3PIDController(Node):
 
         desiredAngle = np.arctan2(self.currentWaypoint[1] - self.y, self.currentWaypoint[0] - self.x)
 
-        path1 = desiredAngle - self.theta
-        path2 = desiredAngle - (np.pi - self.theta)
-
-        print(f"Error 1: {path1}")
-        print(f"Error 2: {path2}")
-
-        if (abs(path1) > abs(path2)):
-            self.err = path2
-        else:
-            self.err = path1
+        self.err = (desiredAngle - self.theta + (3 * np.pi)) % (2 * np.pi) - np.pi
 
         # self.err = np.pi / 2 - yaw #tuning code
 
         print(f"Im at {self.x, self.y}\n")
         print(f"Im heading to {self.currentWaypoint[0], self.currentWaypoint[1]}\n")
+        print(f"My final goal is  {self.goalData[0], self.goalData[1]}\n")
         print(f"My error is {self.err}\n")
+        print(f"Im desired angle is {desiredAngle}\n")
         return self.err
         #return np.pi/2 - self.theta
 
@@ -272,6 +306,7 @@ class Turtlebot3PIDController(Node):
             self.determineRoute()
 
         if self.odomData is not None and self.waypoints is not None:
+            print(self.waypoints)
             self.currentWaypoint = self.waypoints[self.waypoint_counter, :]
             self.getLocation()
             current_state = np.array([self.x, self.y])
