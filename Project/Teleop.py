@@ -7,6 +7,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32
 from sensor_msgs.msg import LaserScan
+from rclpy.qos import qos_profile_sensor_data
 
 
 class Turtlebot3Teleop(Node):
@@ -59,10 +60,11 @@ class Turtlebot3Teleop(Node):
         self.rearState = "none"  # state of rear obstacle detection
 
         # Data publishing and subscription
+        # print("here")
         self.rate = int(1 / self.sampleTime)  # 10hz
         self.scanData = None  # empty variable
         self.scanTopic = '/scan'
-        self.create_subscription(LaserScan, self.scanTopic, self.scan_callback, self.rate)  # subscribe to the odometry data and when messages are received, self.odom_callback is invoked # NEW
+        self.create_subscription(LaserScan, self.scanTopic, self.scan_callback, qos_profile_sensor_data)  # subscribe to the odometry data and when messages are received, self.odom_callback is invoked # NEW
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', int(self.rate))  # publishing velocity data # NEW
         self.err = Float32()
 
@@ -257,6 +259,7 @@ class Turtlebot3Teleop(Node):
 
     def run(self):
         if self.enabled and self.scanData is not None:
+            print(self.linearVelControl)
             self.obstacleOverride() # override user input to avoid hitting stuff
             self.calculateControls() # calculate input to drive system
 
@@ -277,3 +280,5 @@ def main(args=None):
 
 if __name__ == '__main__':
 	main()
+
+#Nathan and Xavier are very kewl
