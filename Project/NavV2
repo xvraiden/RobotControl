@@ -35,7 +35,7 @@ class Turtlebot3PIDController(Node):
         # Waypoint params
         self.waypointParcerSize = 0.15 # distance between each waypoint
         self.distThreshold = 0.05  # distance threshold for waypoint navigation
-        self.obstacleThreshold = 95 # cutoff for what is and isnt an obstacle
+        self.obstacleThreshold = 65 # cutoff for what is and isnt an obstacle
 
         # Force tuning coeff
         self.attractiveForceCoeff = 1  # attractive force scalar
@@ -66,7 +66,7 @@ class Turtlebot3PIDController(Node):
         self.angularStart = 30 * np.pi / 180  # angular distance before forward velocity begins
 
         # Input coordinate params
-        self.obstacles = np.zeros([1, 2]) # row vectors of obstacles [q1, q2] pos
+        self.obstacles = np.empty([0, 2]) # row vectors of obstacles [q1, q2] pos
 
         # Data storage
         self.calcPath = False  # do we need to calculate a new path
@@ -206,7 +206,7 @@ class Turtlebot3PIDController(Node):
 
         ## Loop until at goal
         while (abs(currentTargetDist) > self.acceptableTargetError):
-            print("loop")
+            #print("loop")
             Frc = np.zeros(2)
             # Find distance to target
             goalErrorVect = robotPoints[step, :] - self.goalData #Where im at-goal vector so in [x,y]
@@ -242,27 +242,38 @@ class Turtlebot3PIDController(Node):
             if step > self.notMovingLookback:
                 stepVect = newPoint - robotPoints[step - (self.notMovingLookback - 1),:]  # Determine step size for local min over multiple iterations to identify oscillation
                 self.FrusteratedLocalMinNumber = self.FrusteratedLocalMinNumber + 1
-                maxnum=20000
+                maxnum=1000
 
                 if self.FrusteratedLocalMinNumber <maxnum : #If the og min solution doesnt work, go to a point that alligns with either x or y, then restart the path
                     pass
                 elif self.FrusteratedLocalMinNumber >=maxnum :
                     print("Its frusterated")
-                    chosen = np.random.randint(0, 2)  # Random choice between 0 and 1
+                    chosen = np.random.randint(0, 2)  # Randomly choose axis: 0 for X-axis, 1 for Y-axis
                     if chosen == 0:
-                        HonnValue = np.array([self.goalData[0] - self.x, 0])  # Move along x-axis
+                        # Escape along X-axis
+                        delta = self.goalData[0] - self.x
+                        HonnNum = -3 if delta < 0 else 3
+                        escape_pt = np.array([self.x + HonnNum, self.y])
                     else:
-                        HonnValue = np.array([0, self.goalData[1] - self.y])  # Move along y-axis
-                        self.FrusteratedLocalMinNumber = 0
-                    
-                    #Normalize vector, avoid large steps
-                    if np.linalg.norm(HonnValue) > 0:
-                        HonnValue = HonnValue / np.linalg.norm(HonnValue)
-                    
-                    newPoint = robotPoints[step, :] + self.stepSizeCoeff * HonnValue
+                        # Escape along Y-axis
+                        delta = self.goalData[1] - self.y
+                        HonnNum = -3 if delta < 0 else 3
+                        escape_pt = np.array([self.x, self.y + HonnNum])
+
+                    #Add the escape point to the robot path, reset frustration counter
+                    robotPoints = np.vstack((robotPoints, escape_pt))
+                    self.FrusteratedLocalMinNumber = 0
+
+                    self.waypoints = np.array([escape_pt])  #single‐element waypoint list
+                    self.waypoint_counter = 0  #start at element 0
+                    self.running = 1.0  #enable movement
+                    self.forward = 1.0  #allow forward motion immediately
+                    self.calcPath = False  #don’t replan until after this jump
+                    return
+
                 # Determine if the robot is trying to move to a spot it was just at (not making progress) and random walk under the assumption of a local min
                 if math.sqrt(np.dot(stepVect, stepVect)) < self.notMovingDist and np.dot(Frc, Frc) > 0:
-                    print("local min")
+                    print(f"I'm in a local min, im {(float(self.FrusteratedLocalMinNumber/maxnum)*100):.2f}% frusterated \n")
                     FrcH = np.cross([Frc[0], Frc[1], 0], [0, 0, 1])
                     JeffersonValue = FrcH / math.sqrt(np.dot(FrcH, FrcH))
                     newPoint = robotPoints[step, :] + self.stepSizeCoeff * JeffersonValue[0:2]
@@ -396,6 +407,7 @@ class Turtlebot3PIDController(Node):
                         self.running = 0.0
                         self.waypoints = None
                         print("Completed Path")
+                        self.calcPath = True
 
         twist = Twist()
         twist.linear.x = self.linear_vel * self.running * self.forward
