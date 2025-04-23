@@ -51,9 +51,10 @@ class Turtlebot3Teleop(Node):
         self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release).start()
 
         # obstacle detection params
-        self.cautionRadius = 0.5 # slow down when obstacle is closer than this [m]
-        self.cautionSpeed = 0.25 # percentage of full speed when close to obstacle
-        self.stopRadius = 0.35 # initiate safe stop when obstacle is closer than this[m]
+        TeleopFix=10
+        self.cautionRadius = 0.5/TeleopFix # slow down when obstacle is closer than this [m]
+        self.cautionSpeed = 0.25/TeleopFix # percentage of full speed when close to obstacle
+        self.stopRadius = 0.35/TeleopFix # initiate safe stop when obstacle is closer than this[m]
         self.emergencyRadius = 0.2 # initiate emergency stop when obstacle is closer than this [m]
         self.angularInterest = 15 # angle to include data off the front and rear [deg]
         self.frontState = "none" # state of front obstacle detection
@@ -70,7 +71,7 @@ class Turtlebot3Teleop(Node):
 
         self.timer = self.create_timer(self.sampleTime, self.run)
 
-    def scan_callback(self, msg):  # Initiate odometry data
+    def scan_callback(self, msg):
         self.scanData = msg
 
     def on_press(self, key):
@@ -166,18 +167,35 @@ class Turtlebot3Teleop(Node):
             # get data of interest
             frontDistances = self.scanData.ranges[indexFrontLeftStart:indexFrontLeftEnd] + self.scanData.ranges[indexFrontRightStart:indexFrontRightEnd]
             rearDistances = self.scanData.ranges[indexRearStart:indexRearEnd]
-
+        
+            # Filter out only zero values - keep small non-zero values
+            frontDistances = [d for d in frontDistances if d > 0.001]
+            rearDistances = [d for d in rearDistances if d > 0.001]
+        
+            # Default values if no valid readings are found
+            min_front = float('inf')
+            min_rear = float('inf')
+        
+            # Only calculate minimum if there are valid readings
+            if frontDistances:
+                min_front = min(frontDistances)
+            if rearDistances:
+                min_rear = min(rearDistances)
+            
+            print(f"Min front distance: {min_front:.2f}m, Min rear distance: {min_rear:.2f}m")
+        
+            # Forward movement checks
             if self.linearVelControl >= 0:
-                if min(frontDistances) < self.emergencyRadius:
+                if min_front < self.emergencyRadius:
                     if self.frontState != "emergency":
                         self.frontState = "emergency"
                         print("front emergency stop")
-                elif min(frontDistances) < self.stopRadius:
+                elif min_front < self.stopRadius:
                     if self.frontState != "stop":
                         self.frontState = "stop"
                         self.augmentCommand("linear")
                         print("front stop")
-                elif min(frontDistances) < self.cautionRadius:
+                elif min_front < self.cautionRadius:
                     if self.frontState != "caution":
                         self.frontState = "caution"
                         self.augmentCommand("linear")
@@ -187,17 +205,18 @@ class Turtlebot3Teleop(Node):
                         self.frontState = "none"
                         self.augmentCommand("linear")
 
+            # Reverse movement checks
             if self.linearVelControl <= 0:
-                if min(rearDistances) < self.emergencyRadius:
+                if min_rear < self.emergencyRadius:
                     if self.rearState != "emergency":
                         self.rearState = "emergency"
                         print("rear emergency stop")
-                elif min(rearDistances) < self.stopRadius:
+                elif min_rear < self.stopRadius:
                     if self.rearState != "stop":
                         self.rearState = "stop"
                         self.augmentCommand("linear")
                         print("rear stop")
-                elif min(rearDistances) < self.cautionRadius:
+                elif min_rear < self.cautionRadius:
                     if self.rearState != "caution":
                         self.rearState = "caution"
                         self.augmentCommand("linear")
@@ -259,7 +278,7 @@ class Turtlebot3Teleop(Node):
 
     def run(self):
         if self.enabled and self.scanData is not None:
-            print(self.linearVelControl)
+            #print(self.linearVelControl)
             self.obstacleOverride() # override user input to avoid hitting stuff
             self.calculateControls() # calculate input to drive system
 
@@ -280,5 +299,3 @@ def main(args=None):
 
 if __name__ == '__main__':
 	main()
-
-#Nathan and Xavier are very kewl
