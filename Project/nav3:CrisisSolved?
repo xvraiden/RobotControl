@@ -35,7 +35,7 @@ class Turtlebot3PIDController(Node):
         # Waypoint params
         self.waypointParcerSize = 0.15 # distance between each waypoint
         self.distThreshold = 0.05  # distance threshold for waypoint navigation
-        self.obstacleThreshold = 65 # cutoff for what is and isnt an obstacle
+        self.obstacleThreshold = 65 # cutoff for what is and isnt an obstacle #65 was historical
 
         # Force tuning coeff
         self.attractiveForceCoeff = 1  # attractive force scalar
@@ -198,7 +198,7 @@ class Turtlebot3PIDController(Node):
         plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
         plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
         if self.diditrunbefore==False:
-            plt.legend()
+            #plt.legend()
             self.diditrunbefore=True
         #plt.xlim([-1,1])
         plt.title("Path Simulation")
