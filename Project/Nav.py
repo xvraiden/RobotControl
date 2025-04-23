@@ -16,7 +16,8 @@ from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Float32
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 from visualization_msgs.msg import MarkerArray
-import random
+from tf2_ros import StaticTransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 import matplotlib.pyplot as plt
 
 
@@ -34,12 +35,27 @@ class Turtlebot3PIDController(Node):
         # Waypoint params
         self.waypointParcerSize = 0.15 # distance between each waypoint
         self.distThreshold = 0.05  # distance threshold for waypoint navigation
-        self.obstacleThreshold = 70 # cutoff for what is and isnt an obstacle
+        self.obstacleThreshold = 70 # cutoff for what is and isnt an obstacle #65 was historical
 
         # Force tuning coeff
         self.attractiveForceCoeff = 1  # attractive force scalar
         self.repulsiveForceCoeff = 1  # repulsive force scalar
         self.stepSizeCoeff = 0.01  # step size per iteration
+
+        #Static TF map-> odom
+        self.static_broadcaster = StaticTransformBroadcaster(self)
+        static_tf = TransformStamped()
+        static_tf.header.stamp = self.get_clock().now().to_msg()
+        static_tf.header.frame_id = 'map'
+        static_tf.child_frame_id = 'odom'
+        static_tf.transform.translation.x = 0.0
+        static_tf.transform.translation.y = 0.0
+        static_tf.transform.translation.z = 0.0
+        static_tf.transform.rotation.x = 0.0
+        static_tf.transform.rotation.y = 0.0
+        static_tf.transform.rotation.z = 0.0
+        static_tf.transform.rotation.w = 1.0
+        self.static_broadcaster.sendTransform(static_tf)
 
         # Distance thresholds
         self.attractiveSwitch = 0.1  # distance where attractive force becomes linear
@@ -50,7 +66,7 @@ class Turtlebot3PIDController(Node):
         self.angularStart = 30 * np.pi / 180  # angular distance before forward velocity begins
 
         # Input coordinate params
-        self.obstacles = np.zeros([1, 2]) # row vectors of obstacles [q1, q2] pos
+        self.obstacles = np.empty([0, 2]) # row vectors of obstacles [q1, q2] pos
 
         # Data storage
         self.calcPath = False  # do we need to calculate a new path
@@ -68,6 +84,9 @@ class Turtlebot3PIDController(Node):
         self.angular_vel = 0.0 # initial angular speed
         self.running = 0.0 # allow robot motion
         self.forward = 0.0 # allow forward motion
+
+        # Global Step Stuff
+        self.FrusteratedLocalMinNumber=0
 
         # PID initial parameters
         self.derivative = 0.0 # derivative term
@@ -116,6 +135,15 @@ class Turtlebot3PIDController(Node):
 
             if self.odomData is not None and self.goalData is not None:
                 self.calcPath = True
+
+        # if self.obstacles is not None:
+        #     fig = plt.figure(2)
+        #     plt.clf()
+        #     robotPlot = plt.plot(self.x, self.y, 'r*', label="Robot")
+        #     plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
+        #     plt.title("Obsticle Simulation Simulation")
+        #     plt.legend()
+        #     plt.pause(0.001)
 
     def goal_callback(self, msg):  # Initiate odometry data
         if self.odomData is not None:
@@ -166,6 +194,7 @@ class Turtlebot3PIDController(Node):
     def determineRoute(self):
         now = self.get_clock().now()
         self.calcPath = False
+        self.diditrunbefore=False
         currentTargetDist = 100 * self.acceptableTargetError  # initialize distance to enter loop
         self.waypoint_counter = 0
         step = 0 # Reset path starting step
@@ -177,24 +206,27 @@ class Turtlebot3PIDController(Node):
         robotPlot = plt.plot(robotPoints[:, 0], robotPoints[:, 1], 'r*', label="Robot")
         plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
         plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
-        plt.title("Path Simulation")
+        if self.diditrunbefore==False:
+            #plt.legend()
+            self.diditrunbefore=True
         #plt.xlim([-1,1])
-        plt.legend()
+        plt.title("Path Simulation")
         plt.pause(0.001)
 
         ## Loop until at goal
         while (abs(currentTargetDist) > self.acceptableTargetError):
-            print("loop")
+            #print("loop")
             Frc = np.zeros(2)
             # Find distance to target
-            goalErrorVect = robotPoints[step, :] - self.goalData
-            currentTargetDist = math.sqrt(np.dot(goalErrorVect, goalErrorVect))
+            goalErrorVect = robotPoints[step, :] - self.goalData #Where im at-goal vector so in [x,y]
+            currentTargetDist = math.sqrt(np.dot(goalErrorVect, goalErrorVect))  #Euclidean distance to goal from bot
 
             # Calculate attractive force
-            if (currentTargetDist > self.attractiveSwitch):
-                Fattract = -self.attractiveForceCoeff * goalErrorVect
-            else:
-                Fattract = -(self.attractiveForceCoeff * self.attractiveSwitch * goalErrorVect) / currentTargetDist
+            if (currentTargetDist > self.attractiveSwitch): #Far from goal
+                Fattract = -self.attractiveForceCoeff * goalErrorVect #PE grows as square of distance (quadratic), force directly proportional to distance
+            else: #Near goal
+                Fattract = -(self.attractiveForceCoeff * self.attractiveSwitch * goalErrorVect) / currentTargetDist #PE grows as linear to distance, force is constant
+                #F = -attractiveForceCoeff * attractiveSwitch * direction_to_goal
 
             for i in range(np.shape(self.obstacles)[0]):
                 # Find distance to obstacle
@@ -218,10 +250,48 @@ class Turtlebot3PIDController(Node):
 
             if step > self.notMovingLookback:
                 stepVect = newPoint - robotPoints[step - (self.notMovingLookback - 1),:]  # Determine step size for local min over multiple iterations to identify oscillation
+                self.FrusteratedLocalMinNumber = self.FrusteratedLocalMinNumber + 1
+                maxnum=501
+
+                if self.FrusteratedLocalMinNumber <maxnum : #If the og min solution doesnt work, go to a point that alligns with either x or y, then restart the path
+                    pass
+                elif self.FrusteratedLocalMinNumber >=maxnum :
+                    print("Its frusterated")
+                    SmallestXToObsticleFromBot=np.min(self.obstacles[:,0]-robotPoints[step,0])
+                    SmallestYToObsticleFromBot=np.min(self.obstacles[:,1]-robotPoints[step,1])
+                    chosen = 0 if SmallestXToObsticleFromBot > SmallestYToObsticleFromBot else 1
+                    #chosen = np.random.randint(0, 2)  # Randomly choose axis: 0 for X-axis, 1 for Y-axis
+                    if chosen == 0:
+                        print("I choose to go in the X direction \n")
+                    elif chosen == 1:
+                        print("I choose to go in the Y direction \n")
+                    else:
+                        print("I don't know what to do \n")
+                    if chosen == 0:
+                        # Escape along X-axis
+                        delta = self.goalData[0] - self.x
+                        HonnNum = -3 if delta < 0 else 3
+                        escape_pt = np.array([self.x + HonnNum, self.y])
+                    else:
+                        # Escape along Y-axis
+                        delta = self.goalData[1] - self.y
+                        HonnNum = -3 if delta < 0 else 3
+                        escape_pt = np.array([self.x, self.y + HonnNum])
+
+                    #Add the escape point to the robot path, reset frustration counter
+                    robotPoints = np.vstack((robotPoints, escape_pt))
+                    self.FrusteratedLocalMinNumber = 0
+
+                    self.waypoints = np.array([escape_pt])  #single‐element waypoint list
+                    self.waypoint_counter = 0  #start at element 0
+                    self.running = 1.0  #enable movement
+                    self.forward = 1.0  #allow forward motion immediately
+                    self.calcPath = False  #don’t replan until after this jump
+                    return
 
                 # Determine if the robot is trying to move to a spot it was just at (not making progress) and random walk under the assumption of a local min
                 if math.sqrt(np.dot(stepVect, stepVect)) < self.notMovingDist and np.dot(Frc, Frc) > 0:
-                    print("local min")
+                    print(f"I'm in a local min, im {(float(self.FrusteratedLocalMinNumber/maxnum)*100):.2f}% frusterated \n")
                     FrcH = np.cross([Frc[0], Frc[1], 0], [0, 0, 1])
                     JeffersonValue = FrcH / math.sqrt(np.dot(FrcH, FrcH))
                     newPoint = robotPoints[step, :] + self.stepSizeCoeff * JeffersonValue[0:2]
@@ -245,32 +315,34 @@ class Turtlebot3PIDController(Node):
         else:
             self.waypoints = None
 
-        '''fig = plt.figure(1)
-        robotPlot = plt.plot(robotPoints[:, 0], robotPoints[:, 1], 'r*', label="Robot")
-        plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
-        plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
-        plt.title("Path Simulation")
-        plt.legend()
-        plt.pause(0.001)
-
-        fig = plt.figure(2)
-        robotPlot = plt.plot(self.waypoints[:, 0], self.waypoints[:, 1], 'r*', label="Robot")
-        plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
-        plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
-        plt.title("Waypoint Simulation")
-        plt.legend()
-        plt.show()'''
+        # fig = plt.figure(3)
+        # robotPlot = plt.plot(robotPoints[:, 0], robotPoints[:, 1], 'r*', label="Robot")
+        # plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
+        # plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
+        # plt.title("Path Simulation")
+        # plt.legend()
+        # plt.pause(0.001)
+        #
+        # fig = plt.figure(2)
+        # robotPlot = plt.plot(self.waypoints[:, 0], self.waypoints[:, 1], 'r*', label="Robot")
+        # plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
+        # plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
+        # plt.title("Waypoint Simulation")
+        # plt.legend()
+        # plt.show()
 
         print(f"Path planning time {(self.get_clock().now() - now).nanoseconds * 1e-9} \n")
 
     def getLocation(self):  # get the yaw angle by converting rotations to euler angles
-        orientation_q = self.odomData.pose.pose.orientation
-        orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
-        (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
+        if self.odomData is not None:
+            orientation_q = self.odomData.pose.pose.orientation
+            orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
+            (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
 
-        self.theta = yaw
-        self.x = self.odomData.pose.pose.position.x
-        self.y = self.odomData.pose.pose.position.y
+            self.theta = yaw
+            self.x = self.odomData.pose.pose.position.x
+            self.y = self.odomData.pose.pose.position.y
+
 
     def saturate(self, input,
                  delta):  # function to saturate the output from the PID controller inside an acceptable range
@@ -328,6 +400,7 @@ class Turtlebot3PIDController(Node):
         return control
 
     def run(self):
+        self.getLocation()
         angleVel = 0.0
         if self.calcPath:
             twist = Twist()
@@ -355,6 +428,7 @@ class Turtlebot3PIDController(Node):
                         self.running = 0.0
                         self.waypoints = None
                         print("Completed Path")
+                        self.calcPath = True
 
         twist = Twist()
         twist.linear.x = self.linear_vel * self.running * self.forward
