@@ -182,7 +182,7 @@ class Turtlebot3Teleop(Node):
             if rearDistances:
                 min_rear = min(rearDistances)
             
-            print(f"Min front distance: {min_front:.2f}m, Min rear distance: {min_rear:.2f}m")
+            #print(f"Min front distance: {min_front:.2f}m, Min rear distance: {min_rear:.2f}m")
         
             # Forward movement checks
             if self.linearVelControl >= 0:
