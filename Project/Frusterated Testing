@@ -1,0 +1,36 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+dataPoints = np.array(np.meshgrid(np.linspace(-5,5,5), np.linspace(-5,5,5))).reshape(-1, 2)
+print(f"dataPoints are {dataPoints}\n*********{(len(dataPoints))} data points*********\n")
+
+targetCoord = np.array([0,0])
+
+# Initialize cleanPoints as an empty array with 2 columns
+cleanPoints = np.empty((0, 2))  # Empty array with 0 rows but 2 columns
+
+# Find indices where elements are greater than 10mm
+for index, point in enumerate(dataPoints):
+    euclidianDistance = np.linalg.norm(point-targetCoord)
+    print(euclidianDistance)
+    if euclidianDistance > 1:
+        cleanPoints = np.vstack((cleanPoints, point))
+
+print(cleanPoints)
+
+fig = plt.figure(1)
+circle1 = plt.Circle((0, 0), 1, color='r')
+ax = plt.gca()
+ax.add_patch(circle1)
+
+# Check if cleanPoints has any data before trying to plot it
+if cleanPoints.size > 0:
+    plt.plot(dataPoints[:,0], dataPoints[:,1], 'ko', cleanPoints[:,0], cleanPoints[:,1], 'bo')
+else:
+    plt.plot(dataPoints[:,0], dataPoints[:,1], 'ro')
+    print("No clean points found within the distance threshold.")
+
+plt.axis('equal')  # To ensure the circle looks like a circle
+plt.grid(True)
+plt.legend(["zone", "data", "clean"])
+plt.show()
