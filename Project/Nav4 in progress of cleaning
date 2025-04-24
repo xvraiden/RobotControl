@@ -134,6 +134,7 @@ class Turtlebot3PIDController(Node):
 
             if self.odomData is not None and self.goalData is not None:
                 self.calcPath = True
+                print("I need to find a new path")
 
         # if self.obstacles is not None:
         #     fig = plt.figure(2)
@@ -202,6 +203,7 @@ class Turtlebot3PIDController(Node):
         robotPoints = np.array([[self.x, self.y]]) # initialize start pos
 
         fig = plt.figure(1)
+        plt.clf()
         robotPlot = plt.plot(robotPoints[:, 0], robotPoints[:, 1], 'r*', label="Robot")
         plt.plot(self.goalData[0], self.goalData[1], 'bx', label="Goal")
         plt.plot(self.obstacles[:, 0], self.obstacles[:, 1], 'ko', label="Obstacles")
@@ -250,9 +252,8 @@ class Turtlebot3PIDController(Node):
             if step > self.notMovingLookback:
                 stepVect = newPoint - robotPoints[step - (self.notMovingLookback - 1),:]  # Determine step size for local min over multiple iterations to identify oscillation
                 #Begin Frusterated Protocal
-                self.FrusteratedLocalMinNumber = self.FrusteratedLocalMinNumber + 1
 
-                maxnum=501
+                maxnum=25
 
                 if self.FrusteratedLocalMinNumber <maxnum:
                     # Determine if the robot is trying to move to a spot it was just at (not making progress) and random walk under the assumption of a local min
@@ -261,12 +262,14 @@ class Turtlebot3PIDController(Node):
                         FrcH = np.cross([Frc[0], Frc[1], 0], [0, 0, 1])
                         JeffersonValue = FrcH / np.sqrt(np.dot(FrcH, FrcH))
                         newPoint = robotPoints[step, :] + self.stepSizeCoeff * JeffersonValue[0:2]
+                        self.FrusteratedLocalMinNumber = self.FrusteratedLocalMinNumber + 1
 
                 elif self.FrusteratedLocalMinNumber >=maxnum:
                     print("Its frusterated")
                     #chosen = 0 if SmallestXToObsticleFromBot > SmallestYToObsticleFromBot else 1
 
-                    if Frc[1] > Frc[0]: #If y is greater than x (component of force)
+                    print(Frc)
+                    if abs(Frc[1]) > abs(Frc[0]): #If y is greater than x (component of force)
                         chosen = 0
                     else:
                         chosen = 1
@@ -292,6 +295,22 @@ class Turtlebot3PIDController(Node):
                     newPoint = escape_pt #Avoids double placeing
                     self.FrusteratedLocalMinNumber = 0
 
+
+                    # Filter out oscillations
+                    targetCoord = robotPoints[step, :]
+
+                    # Initialize cleanPoints as an empty array with 2 columns
+                    cleanPoints = np.empty((0, 2))  # Empty array with 0 rows but 2 columns
+
+                    # Find indices where elements are greater than 10mm
+                    for index, point in enumerate(robotPoints):
+                        euclidianDistance = np.linalg.norm(point - targetCoord)
+                        if euclidianDistance > self.waypointParcerSize:
+                            cleanPoints = np.vstack((cleanPoints, point))
+
+                    robotPoints = cleanPoints
+                    step = np.shape(robotPoints)[0] - 1
+
             # Add new points to the list of points
             robotPoints = np.vstack((robotPoints, newPoint))
 
@@ -301,6 +320,7 @@ class Turtlebot3PIDController(Node):
 
             # Next calc
             step = step + 1
+
 
         waypointIncrementer = int(self.waypointParcerSize / self.stepSizeCoeff)
 
